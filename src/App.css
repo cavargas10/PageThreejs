@@ -1,0 +1,79 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background-color: black;
+  color: white;
+  overflow: hidden;
+}
+
+.App {
+  position: relative;
+  min-height: 100vh;
+}
+
+header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  z-index: 10;
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+nav ul {
+  list-style-type: none;
+  display: flex;
+  padding: 0;
+}
+
+nav ul li {
+  margin-left: 20px;
+}
+
+.content {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 50px;
+  z-index: 2;
+}
+
+h1 {
+  font-size: 72px;
+  margin: 0;
+  line-height: 1;
+}
+
+p {
+  max-width: 400px;
+  font-size: 18px;
+  margin-top: 20px;
+}
+
+.particle-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.particle-model-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
