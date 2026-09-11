@@ -1,7 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { AmbientLight, DirectionalLight } from 'three';
 import vertex from './shaders/vertex.glsl';
 import fragment from './shaders/fragment.glsl';
 import monkeySrc from '/3d-models/monkey-head/scene.gltf?url';
@@ -17,27 +16,36 @@ const ParticleModel = () => {
   const mountRef = useRef(null);
 
   useEffect(() => {
+    const mouse = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+    };
+
     const uniforms = {
       uTime: { value: 0 },
       uProgress: { value: 0 },
+      uMouse: { value: new THREE.Vector2(0, 0) },
     };
 
+    // Scroll trigger morph animation across page scroll
     gsap.to(uniforms.uProgress, {
       value: 1,
-      duration: 2,
-      ease: 'linear',
+      ease: 'power1.inOut',
       scrollTrigger: {
-        trigger: mountRef.current,
+        trigger: document.body,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 2,
+        scrub: 1.5,
       },
     });
 
     const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x05050a, 0.05);
+
     const manager = new THREE.LoadingManager();
     const loader = new GLTFLoader(manager);
-    
 
     const models = {
       monkey: null,
@@ -46,7 +54,8 @@ const ParticleModel = () => {
 
     manager.onLoad = () => {
       createParticles(models);
-      createBackgroundParticles(); 
+      createBackgroundParticles();
+      createParticleRings();
     };
 
     loader.load(rabbitSrc, (gltf) => {
@@ -57,10 +66,12 @@ const ParticleModel = () => {
         }
       });
 
-      model.geometry.scale(1.75, 1.75, 1.75);
-      model.geometry.rotateY(Math.PI * 0.5);
-      model.geometry.center();
-      models.rabbit = model;
+      if (model) {
+        model.geometry.scale(1.85, 1.85, 1.85);
+        model.geometry.rotateY(Math.PI * 0.5);
+        model.geometry.center();
+        models.rabbit = model;
+      }
     });
 
     loader.load(monkeySrc, (gltf) => {
@@ -71,53 +82,61 @@ const ParticleModel = () => {
         }
       });
 
-      model.geometry.scale(2, 2, 2);
-      models.monkey = model;
+      if (model) {
+        model.geometry.scale(2.1, 2.1, 2.1);
+        models.monkey = model;
+      }
     });
 
+    let mainParticlesGroup = new THREE.Group();
+    scene.add(mainParticlesGroup);
+
     const createParticles = ({ monkey, rabbit }) => {
+      if (!monkey || !rabbit) return;
+
       const monkeySampler = new MeshSurfaceSampler(monkey).build();
       const rabbitSampler = new MeshSurfaceSampler(rabbit).build();
 
       const geometry = new THREE.BufferGeometry();
-      const num = 10000; 
+      const num = 14000;
 
       const positionArray = new Float32Array(num * 3);
       const position2Array = new Float32Array(num * 3);
       const colorArray = new Float32Array(num * 3);
       const offsetArray = new Float32Array(num);
+      const sizeArray = new Float32Array(num);
 
       const pos = new THREE.Vector3();
       const colors = [
-        new THREE.Color('purple'),
-        new THREE.Color('mediumpurple'),
-        new THREE.Color('plum'),
+        new THREE.Color('#9d4edd'),
+        new THREE.Color('#c77dff'),
+        new THREE.Color('#e0aaff'),
+        new THREE.Color('#00f5d4'),
+        new THREE.Color('#7b2cbf'),
       ];
 
       for (let i = 0; i < num; i++) {
         monkeySampler.sample(pos);
-        const [x, y, z] = pos.toArray();
-        positionArray.set([x, y, z], i * 3);
+        positionArray.set(pos.toArray(), i * 3);
 
         rabbitSampler.sample(pos);
-        const [x2, y2, z2] = pos.toArray();
-        position2Array.set([x2, y2, z2], i * 3);
+        position2Array.set(pos.toArray(), i * 3);
 
         const color = colors[Math.floor(Math.random() * colors.length)];
-        const [r, g, b] = color.toArray();
-        const offset = Math.random();
+        colorArray.set(color.toArray(), i * 3);
 
-        offsetArray[i] = offset;
-        colorArray.set([r, g, b], i * 3);
+        offsetArray[i] = Math.random();
+        sizeArray[i] = Math.random() * 0.8 + 0.6;
       }
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positionArray, 3));
       geometry.setAttribute('position2', new THREE.BufferAttribute(position2Array, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
       geometry.setAttribute('offset', new THREE.BufferAttribute(offsetArray, 1));
+      geometry.setAttribute('size', new THREE.BufferAttribute(sizeArray, 1));
 
       const material = new THREE.ShaderMaterial({
-        uniforms: { ...uniforms },
+        uniforms,
         fragmentShader: fragment,
         vertexShader: vertex,
         transparent: true,
@@ -126,42 +145,48 @@ const ParticleModel = () => {
       });
 
       const particles = new THREE.Points(geometry, material);
-      scene.add(particles);
+      mainParticlesGroup.add(particles);
     };
 
     const createBackgroundParticles = () => {
       const geometry = new THREE.BufferGeometry();
-      const num = 500; 
+      const num = 1200;
 
       const positionArray = new Float32Array(num * 3);
+      const position2Array = new Float32Array(num * 3);
       const colorArray = new Float32Array(num * 3);
       const offsetArray = new Float32Array(num);
+      const sizeArray = new Float32Array(num);
 
       const colors = [
-        new THREE.Color('purple'),
-        new THREE.Color('mediumpurple'),
-        new THREE.Color('plum'),
+        new THREE.Color('#5a189a'),
+        new THREE.Color('#7b2cbf'),
+        new THREE.Color('#00b4d8'),
       ];
 
       for (let i = 0; i < num; i++) {
-        positionArray.set([
-          (Math.random() - 0.2) * 8 - 2 ,
-          (Math.random() - 0.2) * 5 - 1.5,
-          (Math.random() - 0.2) * 2 + 1
-        ], i * 3);
+        const x = (Math.random() - 0.5) * 20;
+        const y = (Math.random() - 0.5) * 16;
+        const z = (Math.random() - 0.5) * 12 - 2;
+
+        positionArray.set([x, y, z], i * 3);
+        position2Array.set([x * 1.3, y * 1.3, z * 1.3], i * 3);
 
         const color = colors[Math.floor(Math.random() * colors.length)];
         colorArray.set(color.toArray(), i * 3);
 
         offsetArray[i] = Math.random();
+        sizeArray[i] = Math.random() * 0.6 + 0.3;
       }
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positionArray, 3));
+      geometry.setAttribute('position2', new THREE.BufferAttribute(position2Array, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
       geometry.setAttribute('offset', new THREE.BufferAttribute(offsetArray, 1));
+      geometry.setAttribute('size', new THREE.BufferAttribute(sizeArray, 1));
 
       const material = new THREE.ShaderMaterial({
-        uniforms: { ...uniforms },
+        uniforms,
         fragmentShader: fragment,
         vertexShader: vertex,
         transparent: true,
@@ -169,8 +194,54 @@ const ParticleModel = () => {
         blending: THREE.AdditiveBlending,
       });
 
-      const particles = new THREE.Points(geometry, material);
-      scene.add(particles);
+      const bgParticles = new THREE.Points(geometry, material);
+      scene.add(bgParticles);
+    };
+
+    let ringMesh;
+    const createParticleRings = () => {
+      const num = 600;
+      const geometry = new THREE.BufferGeometry();
+      const positionArray = new Float32Array(num * 3);
+      const position2Array = new Float32Array(num * 3);
+      const colorArray = new Float32Array(num * 3);
+      const offsetArray = new Float32Array(num);
+      const sizeArray = new Float32Array(num);
+
+      const ringColor = new THREE.Color('#7000ff');
+
+      for (let i = 0; i < num; i++) {
+        const angle = (i / num) * Math.PI * 2;
+        const radius = 3.2 + Math.random() * 0.3;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        const z = (Math.random() - 0.5) * 0.4;
+
+        positionArray.set([x, y, z], i * 3);
+        position2Array.set([x * 1.2, y * 1.2, z], i * 3);
+        colorArray.set(ringColor.toArray(), i * 3);
+        offsetArray[i] = Math.random();
+        sizeArray[i] = 0.5;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positionArray, 3));
+      geometry.setAttribute('position2', new THREE.BufferAttribute(position2Array, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+      geometry.setAttribute('offset', new THREE.BufferAttribute(offsetArray, 1));
+      geometry.setAttribute('size', new THREE.BufferAttribute(sizeArray, 1));
+
+      const material = new THREE.ShaderMaterial({
+        uniforms,
+        fragmentShader: fragment,
+        vertexShader: vertex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+
+      ringMesh = new THREE.Points(geometry, material);
+      ringMesh.rotation.x = Math.PI * 0.35;
+      scene.add(ringMesh);
     };
 
     const sizes = {
@@ -178,31 +249,49 @@ const ParticleModel = () => {
       height: window.innerHeight,
     };
 
-    const fov = 60;
-    const camera = new THREE.PerspectiveCamera(fov, sizes.width / sizes.height, 0.1);
-    camera.position.set(0, 0, 5);
-    camera.lookAt(new THREE.Vector3(0, 2.5, 0));
+    const camera = new THREE.PerspectiveCamera(60, sizes.width / sizes.height, 0.1, 100);
+    camera.position.set(0, 0, 5.5);
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: window.devicePixelRatio < 2,
-      logarithmicDepthBuffer: true,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
     });
     renderer.setSize(sizes.width, sizes.height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mountRef.current.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enableZoom = false;
 
-    const ambientLight = new AmbientLight(0xffffff, 1.5);
-    const directionalLight = new DirectionalLight(0xffffff, 4.5);
-    directionalLight.position.set(3, 10, 7);
-    scene.add(ambientLight, directionalLight);
+    const handleMouseMove = (event) => {
+      mouse.targetX = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.targetY = -(event.clientY / window.innerHeight) * 2 + 1;
+    };
+
+    window.addEventListener('pointermove', handleMouseMove);
 
     const clock = new THREE.Clock();
 
     const tic = () => {
-      const time = clock.getElapsedTime();
-      uniforms.uTime.value = time;
+      const elapsedTime = clock.getElapsedTime();
+      uniforms.uTime.value = elapsedTime;
+
+      // Smooth mouse lerping
+      mouse.x += (mouse.targetX - mouse.x) * 0.08;
+      mouse.y += (mouse.targetY - mouse.y) * 0.08;
+      uniforms.uMouse.value.set(mouse.x, mouse.y);
+
+      // Rotate particles subtly based on mouse
+      mainParticlesGroup.rotation.y = elapsedTime * 0.05 + mouse.x * 0.4;
+      mainParticlesGroup.rotation.x = mouse.y * 0.2;
+
+      if (ringMesh) {
+        ringMesh.rotation.z = elapsedTime * 0.1;
+      }
+
       controls.update();
       renderer.render(scene, camera);
       requestAnimationFrame(tic);
@@ -217,20 +306,22 @@ const ParticleModel = () => {
       camera.aspect = sizes.width / sizes.height;
       camera.updateProjectionMatrix();
       renderer.setSize(sizes.width, sizes.height);
-
-      const pixelRatio = Math.min(window.devicePixelRatio, 2);
-      renderer.setPixelRatio(pixelRatio);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     };
 
     window.addEventListener('resize', handleResize);
 
+    const mountNode = mountRef.current;
     return () => {
       window.removeEventListener('resize', handleResize);
-      mountRef.current.removeChild(renderer.domElement);
+      window.removeEventListener('pointermove', handleMouseMove);
+      if (mountNode && renderer.domElement) {
+        mountNode.removeChild(renderer.domElement);
+      }
     };
   }, []);
 
-  return <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />;
+  return <div ref={mountRef} className="particle-canvas-container" />;
 };
 
 export default ParticleModel;
